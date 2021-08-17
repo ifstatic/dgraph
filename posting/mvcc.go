@@ -390,7 +390,7 @@ func (txn *Txn) RemoveCachedKeys() {
 		return
 	}
 	for key := range txn.cache.deltas {
-		lCache.Del(key)
+		lCache.Del([]byte(key))
 	}
 }
 
@@ -556,6 +556,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if err != nil {
 		return l, err
 	}
-	lCache.Set(key, l, 0)
+	// lCache.Set(key, l, 0)
+	lCache.Set(key, l)
 	return l, nil
 }

@@ -17,16 +17,11 @@
 package posting
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"time"
-
-	ostats "go.opencensus.io/stats"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/dgo/v210/protos/api"
-	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
 
 	"github.com/dgraph-io/dgraph/protos/pb"
@@ -40,48 +35,84 @@ const (
 var (
 	pstore *badger.DB
 	closer *z.Closer
-	lCache *ristretto.Cache
+	// lCache *ristretto.Cache
+	lCache *GoCache
 )
+
+type GoCache struct {
+	sync.Mutex
+	mp map[string]interface{}
+}
+
+func (c *GoCache) Set(key []byte, l interface{}) {
+	c.Lock()
+	c.mp[string(key)] = l
+	c.Unlock()
+}
+
+func (c *GoCache) Get(key []byte) (interface{}, bool) {
+	c.Lock()
+	v, ok := c.mp[string(key)]
+	c.Unlock()
+	return v, ok
+}
+
+func (c *GoCache) Del(key []byte) {
+	c.Lock()
+	delete(c.mp, string(key))
+	c.Unlock()
+}
+
+func (c *GoCache) Clear() {
+	c.Lock()
+	c.mp = make(map[string]interface{})
+	c.Unlock()
+}
 
 // Init initializes the posting lists package, the in memory and dirty list hash.
 func Init(ps *badger.DB, cacheSize int64) {
 	pstore = ps
 	closer = z.NewCloser(1)
 	go x.MonitorMemoryMetrics(closer)
-	// Initialize cache.
-	if cacheSize == 0 {
-		return
+
+	lCache = &GoCache{
+		mp: make(map[string]interface{}),
 	}
-	var err error
-	lCache, err = ristretto.NewCache(&ristretto.Config{
-		// Use 5% of cache memory for storing counters.
-		NumCounters: int64(float64(cacheSize) * 0.05 * 2),
-		MaxCost:     int64(float64(cacheSize) * 0.95),
-		BufferItems: 64,
-		Metrics:     true,
-		Cost: func(val interface{}) int64 {
-			l, ok := val.(*List)
-			if !ok {
-				return int64(0)
-			}
-			return int64(l.DeepSize())
-		},
-	})
-	x.Check(err)
-	go func() {
-		m := lCache.Metrics
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			// Record the posting list cache hit ratio
-			ostats.Record(context.Background(), x.PLCacheHitRatio.M(m.Ratio()))
-		}
-	}()
+
+	// Initialize cache.
+	// if cacheSize == 0 {
+	// 	return
+	// }
+	// var err error
+	// lCache, err = ristretto.NewCache(&ristretto.Config{
+	// 	// Use 5% of cache memory for storing counters.
+	// 	NumCounters: int64(float64(cacheSize) * 0.05 * 2),
+	// 	MaxCost:     int64(float64(cacheSize) * 0.95),
+	// 	BufferItems: 64,
+	// 	Metrics:     true,
+	// 	Cost: func(val interface{}) int64 {
+	// 		l, ok := val.(*List)
+	// 		if !ok {
+	// 			return int64(0)
+	// 		}
+	// 		return int64(l.DeepSize())
+	// 	},
+	// })
+	// x.Check(err)
+	// go func() {
+	// 	m := lCache.Metrics
+	// 	ticker := time.NewTicker(10 * time.Second)
+	// 	defer ticker.Stop()
+	// 	for range ticker.C {
+	// 		// Record the posting list cache hit ratio
+	// 		ostats.Record(context.Background(), x.PLCacheHitRatio.M(m.Ratio()))
+	// 	}
+	// }()
 }
 
-func UpdateMaxCost(maxCost int64) {
-	lCache.UpdateMaxCost(maxCost)
-}
+// func UpdateMaxCost(maxCost int64) {
+// 	lCache.UpdateMaxCost(maxCost)
+// }
 
 // Cleanup waits until the closer has finished processing.
 func Cleanup() {
