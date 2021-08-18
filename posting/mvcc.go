@@ -373,32 +373,6 @@ func (txn *Txn) ToSkiplist() error {
 	return nil
 }
 
-// // ResetCache will clear all the cached list.
-// func ResetCache() {
-// 	lCache.Clear()
-// }
-
-// // RemoveCacheFor will delete the list corresponding to the given key.
-// func RemoveCacheFor(key []byte) {
-// 	// TODO: investigate if this can be done by calling Set with a nil value.
-// 	lCache.Del(key)
-// }
-
-// // RemoveCachedKeys will delete the cached list by this txn.
-// func (txn *Txn) RemoveCachedKeys() {
-// 	if txn == nil || txn.cache == nil {
-// 		return
-// 	}
-// 	for key := range txn.cache.deltas {
-// 		lCache.Del([]byte(key))
-// 	}
-// }
-
-// func WaitForCache() {
-// 	// TODO Investigate if this is needed and why Jepsen tests fail with the cache enabled.
-// 	// lCache.Wait()
-// }
-
 func unmarshalOrCopy(plist *pb.PostingList, item *badger.Item) error {
 	if plist == nil {
 		return errors.Errorf("cannot unmarshal value to a nil posting list of key %s",

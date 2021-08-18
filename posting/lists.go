@@ -40,48 +40,13 @@ var (
 	pstore *badger.DB
 	closer *z.Closer
 	lCache *ristretto.Cache
-	// lCache *GoCache
 )
-
-type GoCache struct {
-	sync.Mutex
-	mp map[string]interface{}
-}
-
-func (c *GoCache) Set(key []byte, l interface{}) {
-	c.Lock()
-	c.mp[string(key)] = l
-	c.Unlock()
-}
-
-func (c *GoCache) Get(key []byte) (interface{}, bool) {
-	c.Lock()
-	v, ok := c.mp[string(key)]
-	c.Unlock()
-	return v, ok
-}
-
-func (c *GoCache) Del(key []byte) {
-	c.Lock()
-	delete(c.mp, string(key))
-	c.Unlock()
-}
-
-func (c *GoCache) Clear() {
-	c.Lock()
-	c.mp = make(map[string]interface{})
-	c.Unlock()
-}
 
 // Init initializes the posting lists package, the in memory and dirty list hash.
 func Init(ps *badger.DB, cacheSize int64) {
 	pstore = ps
 	closer = z.NewCloser(1)
 	go x.MonitorMemoryMetrics(closer)
-
-	// lCache = &GoCache{
-	// 	mp: make(map[string]interface{}),
-	// }
 
 	// Initialize cache.
 	if cacheSize == 0 {
@@ -115,7 +80,7 @@ func Init(ps *badger.DB, cacheSize int64) {
 }
 
 func UpdateMaxCost(maxCost int64) {
-	// lCache.UpdateMaxCost(maxCost)
+	lCache.UpdateMaxCost(maxCost)
 }
 
 // Cleanup waits until the closer has finished processing.
