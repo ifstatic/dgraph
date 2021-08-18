@@ -171,6 +171,8 @@ github.com/dgraph-io/badger/v3 v3.0.0-20210707084205-c40b2e9af902 h1:Hk1GPDKdIAZ
 github.com/dgraph-io/badger/v3 v3.0.0-20210707084205-c40b2e9af902/go.mod h1:dULbq6ehJ5K0cGW/1TQ9iSfUk0gbSiToDWmWmTsJ53E=
 github.com/dgraph-io/badger/v3 v3.0.0-20210818083226-3dfa6f9b67d8 h1:haDeVDtaewcOY2eoHKukgZZoYDCk6E7eQMhOcwuZhs8=
 github.com/dgraph-io/badger/v3 v3.0.0-20210818083226-3dfa6f9b67d8/go.mod h1:uvc2M+tI9lRr6Elx97645Pd8HIeXVU9lH5QkP7kVtCU=
+github.com/dgraph-io/badger/v3 v3.0.0-20210818091407-fd38c21246e2 h1:3vygWWXFHSg1zHi7dP6pEigVOccLlgAQr1TY+EiL7qk=
+github.com/dgraph-io/badger/v3 v3.0.0-20210818091407-fd38c21246e2/go.mod h1:uvc2M+tI9lRr6Elx97645Pd8HIeXVU9lH5QkP7kVtCU=
 github.com/dgraph-io/dgo/v210 v210.0.0-20210407152819-261d1c2a6987 h1:5aN6H88a2q3HkO8vSZxDlgjEpJf4Fz8rfy+/Wzx2uAc=
 github.com/dgraph-io/dgo/v210 v210.0.0-20210407152819-261d1c2a6987/go.mod h1:dCzdThGGTPYOAuNtrM6BiXj/86voHn7ZzkPL6noXR3s=
 github.com/dgraph-io/gqlgen v0.13.2 h1:TNhndk+eHKj5qE7BenKKSYdSIdOGhLqxR1rCiMso9KM=
