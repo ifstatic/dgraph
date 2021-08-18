@@ -901,6 +901,7 @@ func (l *List) Length(readTs, afterUid uint64) int {
 // to be deleted, at which point the entire list will be marked for deletion.
 // As the list grows, existing parts might be split if they become too big.
 func (l *List) Rollup(alloc *z.Allocator) ([]*bpb.KV, error) {
+	return nil, nil
 	l.RLock()
 	defer l.RUnlock()
 	out, err := l.rollup(math.MaxUint64, true)

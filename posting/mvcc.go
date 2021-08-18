@@ -21,12 +21,14 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/badger/v3/skl"
 	"github.com/dgraph-io/badger/v3/y"
@@ -495,14 +497,20 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	}
 	// TODO: Fix this up later.
 
+	var cl *List
 	ts := pstore.LatestTs(key)
+	glog.Infof("[getNew] key: %x readTs: %d latest Ts: %d\n", key, readTs, ts)
 	if ts > 0 && ts < readTs {
 		cacheKey := y.KeyWithTs(key, ts)
 		cachedVal, ok := lCache.Get(cacheKey)
 		if ok {
 			l, ok := cachedVal.(*List)
 			if ok && l != nil {
-				return copyList(l), nil
+				glog.Infof("[getNew] got from cache key: %x l.minTs: %d, l.maxTs: %d\n",
+					key, l.minTs, l.maxTs)
+				cl = copyList(l)
+
+				// return copyList(l), nil
 				// // No need to clone the immutable layer or the key since mutations will not modify it.
 				// lCopy := &List{
 				// 	minTs: l.minTs,
@@ -536,6 +544,9 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if err != nil {
 		return l, err
 	}
+	if cl != nil {
+		equal(cl, l)
+	}
 	lCache.Set(y.KeyWithTs(key, l.maxTs), copyList(l), 0)
 	return l, nil
 }
@@ -551,10 +562,18 @@ func copyList(l *List) *List {
 		plist: proto.Clone(l.plist).(*pb.PostingList),
 	}
 	if l.mutationMap != nil {
-		lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
+		lCopy.mutationMap = make(map[uint64]*pb.PostingList)
 		for ts, pl := range l.mutationMap {
 			lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
 		}
 	}
 	return lCopy
+}
+
+func equal(l1, l2 *List) {
+	if !reflect.DeepEqual(l1, l2) {
+		spew.Dump(l1)
+		spew.Dump(l2)
+		panic("not equal")
+	}
 }
