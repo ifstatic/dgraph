@@ -502,20 +502,21 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		if ok {
 			l, ok := cachedVal.(*List)
 			if ok && l != nil {
-				// No need to clone the immutable layer or the key since mutations will not modify it.
-				lCopy := &List{
-					minTs: l.minTs,
-					maxTs: l.maxTs,
-					key:   key,
-					plist: l.plist,
-				}
-				if l.mutationMap != nil {
-					lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
-					for ts, pl := range l.mutationMap {
-						lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
-					}
-				}
-				return lCopy, nil
+				return copyList(l), nil
+				// // No need to clone the immutable layer or the key since mutations will not modify it.
+				// lCopy := &List{
+				// 	minTs: l.minTs,
+				// 	maxTs: l.maxTs,
+				// 	key:   key,
+				// 	plist: l.plist,
+				// }
+				// if l.mutationMap != nil {
+				// 	lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
+				// 	for ts, pl := range l.mutationMap {
+				// 		lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
+				// 	}
+				// }
+				// return lCopy, nil
 			}
 		}
 	}
@@ -535,6 +536,25 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if err != nil {
 		return l, err
 	}
-	lCache.Set(y.KeyWithTs(key, l.maxTs), l, 0)
+	lCache.Set(y.KeyWithTs(key, l.maxTs), copyList(l), 0)
 	return l, nil
+}
+
+func copyList(l *List) *List {
+	l.Lock()
+	defer l.Unlock()
+	// No need to clone the immutable layer or the key since mutations will not modify it.
+	lCopy := &List{
+		minTs: l.minTs,
+		maxTs: l.maxTs,
+		key:   l.key,
+		plist: proto.Clone(l.plist).(*pb.PostingList),
+	}
+	if l.mutationMap != nil {
+		lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
+		for ts, pl := range l.mutationMap {
+			lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
+		}
+	}
+	return lCopy
 }
