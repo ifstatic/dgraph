@@ -28,7 +28,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/badger/v3/skl"
 	"github.com/dgraph-io/badger/v3/y"
@@ -498,16 +497,16 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// TODO: Fix this up later.
 
 	var cl *List
-	ts := pstore.LatestTs(key)
-	glog.Infof("[getNew] key: %x readTs: %d latest Ts: %d\n", key, readTs, ts)
-	if ts > 0 && ts < readTs {
-		cacheKey := y.KeyWithTs(key, ts)
+	maxTs := pstore.LatestTs(key)
+	// glog.Infof("[getNew] key: %x readTs: %d latest Ts: %d\n", key, readTs, ts)
+	if maxTs > 0 && maxTs < readTs && readTs != math.MaxUint64 {
+		cacheKey := y.KeyWithTs(key, maxTs)
 		cachedVal, ok := lCache.Get(cacheKey)
 		if ok {
 			l, ok := cachedVal.(*List)
 			if ok && l != nil {
-				glog.Infof("[getNew] got from cache key: %x l.minTs: %d, l.maxTs: %d\n",
-					key, l.minTs, l.maxTs)
+				// glog.Infof("[getNew] got from cache key: %x l.minTs: %d, l.maxTs: %d\n",
+				// 	key, l.minTs, l.maxTs)
 				cl = copyList(l)
 
 				// return copyList(l), nil
@@ -545,7 +544,12 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		return l, err
 	}
 	if cl != nil {
-		equal(cl, l)
+		if !reflect.DeepEqual(cl, l) {
+			printList(cl)
+			printList(l)
+			glog.Infof("ReadTs: %d maxTs: %d\n", readTs, maxTs)
+			panic("notEqual")
+		}
 	}
 	lCache.Set(y.KeyWithTs(key, l.maxTs), copyList(l), 0)
 	return l, nil
@@ -570,10 +574,7 @@ func copyList(l *List) *List {
 	return lCopy
 }
 
-func equal(l1, l2 *List) {
-	if !reflect.DeepEqual(l1, l2) {
-		spew.Dump(l1)
-		spew.Dump(l2)
-		panic("not equal")
-	}
+func printList(l *List) {
+	glog.Infof("l.minTs: %d\nl.maxTs: %d\nl.key: %x\nlen(mutationMap): %d\n",
+		l.minTs, l.maxTs, l.key, len(l.mutationMap))
 }
