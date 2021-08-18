@@ -17,12 +17,16 @@
 package posting
 
 import (
+	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/dgo/v210/protos/api"
+	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
+	ostats "go.opencensus.io/stats"
 
 	"github.com/dgraph-io/dgraph/protos/pb"
 	"github.com/dgraph-io/dgraph/x"
@@ -35,8 +39,8 @@ const (
 var (
 	pstore *badger.DB
 	closer *z.Closer
-	// lCache *ristretto.Cache
-	lCache *GoCache
+	lCache *ristretto.Cache
+	// lCache *GoCache
 )
 
 type GoCache struct {
@@ -75,39 +79,39 @@ func Init(ps *badger.DB, cacheSize int64) {
 	closer = z.NewCloser(1)
 	go x.MonitorMemoryMetrics(closer)
 
-	lCache = &GoCache{
-		mp: make(map[string]interface{}),
-	}
+	// lCache = &GoCache{
+	// 	mp: make(map[string]interface{}),
+	// }
 
 	// Initialize cache.
-	// if cacheSize == 0 {
-	// 	return
-	// }
-	// var err error
-	// lCache, err = ristretto.NewCache(&ristretto.Config{
-	// 	// Use 5% of cache memory for storing counters.
-	// 	NumCounters: int64(float64(cacheSize) * 0.05 * 2),
-	// 	MaxCost:     int64(float64(cacheSize) * 0.95),
-	// 	BufferItems: 64,
-	// 	Metrics:     true,
-	// 	Cost: func(val interface{}) int64 {
-	// 		l, ok := val.(*List)
-	// 		if !ok {
-	// 			return int64(0)
-	// 		}
-	// 		return int64(l.DeepSize())
-	// 	},
-	// })
-	// x.Check(err)
-	// go func() {
-	// 	m := lCache.Metrics
-	// 	ticker := time.NewTicker(10 * time.Second)
-	// 	defer ticker.Stop()
-	// 	for range ticker.C {
-	// 		// Record the posting list cache hit ratio
-	// 		ostats.Record(context.Background(), x.PLCacheHitRatio.M(m.Ratio()))
-	// 	}
-	// }()
+	if cacheSize == 0 {
+		return
+	}
+	var err error
+	lCache, err = ristretto.NewCache(&ristretto.Config{
+		// Use 5% of cache memory for storing counters.
+		NumCounters: int64(float64(cacheSize) * 0.05 * 2),
+		MaxCost:     int64(float64(cacheSize) * 0.95),
+		BufferItems: 64,
+		Metrics:     true,
+		Cost: func(val interface{}) int64 {
+			l, ok := val.(*List)
+			if !ok {
+				return int64(0)
+			}
+			return int64(l.DeepSize())
+		},
+	})
+	x.Check(err)
+	go func() {
+		m := lCache.Metrics
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			// Record the posting list cache hit ratio
+			ostats.Record(context.Background(), x.PLCacheHitRatio.M(m.Ratio()))
+		}
+	}()
 }
 
 func UpdateMaxCost(maxCost int64) {

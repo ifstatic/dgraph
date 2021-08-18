@@ -92,8 +92,8 @@ func (ir *incrRollupi) rollUpKey(sl *skl.Skiplist, key []byte) error {
 	if err != nil {
 		return err
 	}
-	// Clear the list from the cache after a rollup.
-	RemoveCacheFor(key)
+	// // Clear the list from the cache after a rollup.
+	// RemoveCacheFor(key)
 
 	const N = uint64(1000)
 	if glog.V(2) {
@@ -373,31 +373,31 @@ func (txn *Txn) ToSkiplist() error {
 	return nil
 }
 
-// ResetCache will clear all the cached list.
-func ResetCache() {
-	lCache.Clear()
-}
+// // ResetCache will clear all the cached list.
+// func ResetCache() {
+// 	lCache.Clear()
+// }
 
-// RemoveCacheFor will delete the list corresponding to the given key.
-func RemoveCacheFor(key []byte) {
-	// TODO: investigate if this can be done by calling Set with a nil value.
-	lCache.Del(key)
-}
+// // RemoveCacheFor will delete the list corresponding to the given key.
+// func RemoveCacheFor(key []byte) {
+// 	// TODO: investigate if this can be done by calling Set with a nil value.
+// 	lCache.Del(key)
+// }
 
-// RemoveCachedKeys will delete the cached list by this txn.
-func (txn *Txn) RemoveCachedKeys() {
-	if txn == nil || txn.cache == nil {
-		return
-	}
-	for key := range txn.cache.deltas {
-		lCache.Del([]byte(key))
-	}
-}
+// // RemoveCachedKeys will delete the cached list by this txn.
+// func (txn *Txn) RemoveCachedKeys() {
+// 	if txn == nil || txn.cache == nil {
+// 		return
+// 	}
+// 	for key := range txn.cache.deltas {
+// 		lCache.Del([]byte(key))
+// 	}
+// }
 
-func WaitForCache() {
-	// TODO Investigate if this is needed and why Jepsen tests fail with the cache enabled.
-	// lCache.Wait()
-}
+// func WaitForCache() {
+// 	// TODO Investigate if this is needed and why Jepsen tests fail with the cache enabled.
+// 	// lCache.Wait()
+// }
 
 func unmarshalOrCopy(plist *pb.PostingList, item *badger.Item) error {
 	if plist == nil {
@@ -520,24 +520,29 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		return nil, badger.ErrDBClosed
 	}
 	// TODO: Fix this up later.
-	cachedVal, ok := lCache.Get(key)
-	if ok {
-		l, ok := cachedVal.(*List)
-		if ok && l != nil {
-			// No need to clone the immutable layer or the key since mutations will not modify it.
-			lCopy := &List{
-				minTs: l.minTs,
-				maxTs: l.maxTs,
-				key:   key,
-				plist: l.plist,
-			}
-			if l.mutationMap != nil {
-				lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
-				for ts, pl := range l.mutationMap {
-					lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
+
+	ts := pstore.LatestTs(key)
+	cacheKey := y.KeyWithTs(key, ts)
+	if ts < readTs {
+		cachedVal, ok := lCache.Get(cacheKey)
+		if ok {
+			l, ok := cachedVal.(*List)
+			if ok && l != nil {
+				// No need to clone the immutable layer or the key since mutations will not modify it.
+				lCopy := &List{
+					minTs: l.minTs,
+					maxTs: l.maxTs,
+					key:   key,
+					plist: l.plist,
 				}
+				if l.mutationMap != nil {
+					lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
+					for ts, pl := range l.mutationMap {
+						lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
+					}
+				}
+				return lCopy, nil
 			}
-			return lCopy, nil
 		}
 	}
 
@@ -556,7 +561,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if err != nil {
 		return l, err
 	}
-	// lCache.Set(key, l, 0)
-	lCache.Set(key, l)
+	lCache.Set(key, l, 0)
+	// lCache.Set(cacheKey, l)
 	return l, nil
 }
