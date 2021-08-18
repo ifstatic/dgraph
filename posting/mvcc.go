@@ -522,8 +522,8 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	// TODO: Fix this up later.
 
 	ts := pstore.LatestTs(key)
-	cacheKey := y.KeyWithTs(key, ts)
-	if ts < readTs {
+	if ts > 0 && ts < readTs {
+		cacheKey := y.KeyWithTs(key, ts)
 		cachedVal, ok := lCache.Get(cacheKey)
 		if ok {
 			l, ok := cachedVal.(*List)
