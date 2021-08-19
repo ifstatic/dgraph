@@ -508,9 +508,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 				cl = copyList(l)
 
 				if !equalList(cl, l) {
-					// printList(cl)
-					// printList(l)
-					glog.Infof("ReadTs: %d maxTs: %d\n", readTs, maxTs)
+					glog.Infof("ReadTs: %d maxTs: %d key: %x\n", readTs, maxTs, key)
 					panic("notEqual after copy")
 				}
 			}
@@ -534,7 +532,7 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	}
 	if cl != nil {
 		if !equalList(cl, l) {
-			glog.Infof("ReadTs: %d maxTs: %d\n", readTs, maxTs)
+			glog.Infof("ReadTs: %d maxTs: %d key: %x\n", readTs, maxTs, key)
 			panic("notEqual after read")
 		}
 	}
