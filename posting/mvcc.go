@@ -569,7 +569,14 @@ func equalList(l1, l2 *List) bool {
 	}
 	if !reflect.DeepEqual(l1.mutationMap, l2.mutationMap) {
 		fmt.Printf("Map not equal\n")
-		fmt.Printf("l1.map: %+v\n\nl2.map: %+v\n", l1.mutationMap, l2.mutationMap)
+		fmt.Printf("l1 --------------------------------\n")
+		for ts, l := range l1.mutationMap {
+			fmt.Printf("[%d] -> %+v\n", ts, l.Postings)
+		}
+		fmt.Printf("l2 --------------------------------\n")
+		for ts, l := range l2.mutationMap {
+			fmt.Printf("[%d] -> %+v\n", ts, l.Postings)
+		}
 		return false
 	}
 	if !proto.Equal(l1.plist, l2.plist) {
