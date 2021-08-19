@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math"
 	"reflect"
 	"sort"
@@ -494,7 +495,6 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if pstore.IsClosed() {
 		return nil, badger.ErrDBClosed
 	}
-	// TODO: Fix this up later.
 
 	var cl *List
 	maxTs := pstore.LatestTs(key)
@@ -505,25 +505,14 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		if ok {
 			l, ok := cachedVal.(*List)
 			if ok && l != nil {
-				// glog.Infof("[getNew] got from cache key: %x l.minTs: %d, l.maxTs: %d\n",
-				// 	key, l.minTs, l.maxTs)
 				cl = copyList(l)
 
-				// return copyList(l), nil
-				// // No need to clone the immutable layer or the key since mutations will not modify it.
-				// lCopy := &List{
-				// 	minTs: l.minTs,
-				// 	maxTs: l.maxTs,
-				// 	key:   key,
-				// 	plist: l.plist,
-				// }
-				// if l.mutationMap != nil {
-				// 	lCopy.mutationMap = make(map[uint64]*pb.PostingList, len(l.mutationMap))
-				// 	for ts, pl := range l.mutationMap {
-				// 		lCopy.mutationMap[ts] = proto.Clone(pl).(*pb.PostingList)
-				// 	}
-				// }
-				// return lCopy, nil
+				if !equalList(cl, l) {
+					// printList(cl)
+					// printList(l)
+					glog.Infof("ReadTs: %d maxTs: %d\n", readTs, maxTs)
+					panic("notEqual after copy")
+				}
 			}
 		}
 	}
@@ -544,11 +533,9 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		return l, err
 	}
 	if cl != nil {
-		if !reflect.DeepEqual(cl, l) {
-			printList(cl)
-			printList(l)
+		if !equalList(cl, l) {
 			glog.Infof("ReadTs: %d maxTs: %d\n", readTs, maxTs)
-			panic("notEqual")
+			panic("notEqual after read")
 		}
 	}
 	lCache.Set(y.KeyWithTs(key, l.maxTs), copyList(l), 0)
@@ -574,7 +561,23 @@ func copyList(l *List) *List {
 	return lCopy
 }
 
-func printList(l *List) {
-	glog.Infof("l.minTs: %d\nl.maxTs: %d\nl.key: %x\nlen(mutationMap): %d\n",
-		l.minTs, l.maxTs, l.key, len(l.mutationMap))
+func equalList(l1, l2 *List) bool {
+	if !bytes.Equal(l1.key, l2.key) {
+		return false
+	}
+	if l1.minTs != l2.minTs || l1.maxTs != l2.maxTs {
+		fmt.Printf("Ts not equal\n")
+		return false
+	}
+	if !reflect.DeepEqual(l1.mutationMap, l2.mutationMap) {
+		fmt.Printf("Map not equal\n")
+		fmt.Printf("l1.map: %+v\n\nl2.map: %+v\n", l1.mutationMap, l2.mutationMap)
+		return false
+	}
+	if !proto.Equal(l1.plist, l2.plist) {
+		fmt.Printf("plist not equal\n")
+		fmt.Printf("l1.plist: %+v\n\nl2.plist: %+v\n", l1.plist, l2.plist)
+		return false
+	}
+	return true
 }
