@@ -20,9 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"math"
-	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -496,8 +494,12 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		return nil, badger.ErrDBClosed
 	}
 
-	var cl *List
 	maxTs := pstore.LatestTs(key)
+	maxTsFromMap := pstore.LatestTsFromMap(key)
+	glog.Infof("----------- maxTs: %d maxTsFromMap: %d\n", maxTs, maxTsFromMap)
+	if maxTsFromMap > 0 && maxTsFromMap != maxTs {
+		panic("Something is wrong")
+	}
 	// glog.Infof("[getNew] key: %x readTs: %d latest Ts: %d\n", key, readTs, ts)
 	if maxTs > 0 && maxTs < readTs && readTs != math.MaxUint64 {
 		cacheKey := y.KeyWithTs(key, maxTs)
@@ -505,11 +507,9 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 		if ok {
 			l, ok := cachedVal.(*List)
 			if ok && l != nil {
-				cl = copyList(l)
-
-				if !equalList(cl, l) {
-					glog.Infof("ReadTs: %d maxTs: %d key: %x\n", readTs, maxTs, key)
-					panic("notEqual after copy")
+				cl := copyList(l)
+				if cl != nil {
+					return cl, nil
 				}
 			}
 		}
@@ -530,13 +530,8 @@ func getNew(key []byte, pstore *badger.DB, readTs uint64) (*List, error) {
 	if err != nil {
 		return l, err
 	}
-	if cl != nil {
-		if !equalList(cl, l) {
-			glog.Infof("ReadTs: %d maxTs: %d key: %x\n", readTs, maxTs, key)
-			panic("notEqual after read")
-		}
-	}
 	lCache.Set(y.KeyWithTs(key, l.maxTs), copyList(l), 0)
+	pstore.SetToTsMap(key, l.maxTs)
 	return l, nil
 }
 
@@ -557,32 +552,4 @@ func copyList(l *List) *List {
 		}
 	}
 	return lCopy
-}
-
-func equalList(l1, l2 *List) bool {
-	if !bytes.Equal(l1.key, l2.key) {
-		return false
-	}
-	if l1.minTs != l2.minTs || l1.maxTs != l2.maxTs {
-		fmt.Printf("Ts not equal\n")
-		return false
-	}
-	if !reflect.DeepEqual(l1.mutationMap, l2.mutationMap) {
-		fmt.Printf("Map not equal\n")
-		fmt.Printf("l1 --------------------------------\n")
-		for ts, l := range l1.mutationMap {
-			fmt.Printf("[%d] -> %+v\n", ts, l.Postings)
-		}
-		fmt.Printf("l2 --------------------------------\n")
-		for ts, l := range l2.mutationMap {
-			fmt.Printf("[%d] -> %+v\n", ts, l.Postings)
-		}
-		return false
-	}
-	if !proto.Equal(l1.plist, l2.plist) {
-		fmt.Printf("plist not equal\n")
-		fmt.Printf("l1.plist: %+v\n\nl2.plist: %+v\n", l1.plist, l2.plist)
-		return false
-	}
-	return true
 }
